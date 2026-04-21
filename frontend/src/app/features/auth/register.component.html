@@ -1,0 +1,50 @@
+<section class="auth-page surface-card" aria-labelledby="register-title">
+  <div class="auth-page__intro">
+    <p class="auth-page__eyebrow">Launch fast</p>
+    <h1 id="register-title">Stand up a control tower for delivery work in minutes.</h1>
+    <p class="auth-page__copy">
+      Create an account to track projects, surface risk early, and keep the whole team moving.
+    </p>
+  </div>
+
+  <form class="auth-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    <div class="auth-form__grid">
+      <label class="auth-form__field">
+        <span>First name</span>
+        <input type="text" formControlName="firstName" autocomplete="given-name" />
+      </label>
+
+      <label class="auth-form__field">
+        <span>Last name</span>
+        <input type="text" formControlName="lastName" autocomplete="family-name" />
+      </label>
+    </div>
+
+    <label class="auth-form__field">
+      <span>Email</span>
+      <input type="email" formControlName="email" autocomplete="email" />
+    </label>
+
+    <label class="auth-form__field">
+      <span>Password</span>
+      <input type="password" formControlName="password" autocomplete="new-password" />
+    </label>
+
+    <p class="auth-form__hint">
+      Use at least 8 characters with upper, lower, and numeric characters.
+    </p>
+
+    @if (errorMessage()) {
+      <p class="auth-form__error" role="alert">{{ errorMessage() }}</p>
+    }
+
+    <button class="auth-form__submit" type="submit" [disabled]="isSubmitting()">
+      {{ isSubmitting() ? 'Creating account...' : 'Create account' }}
+    </button>
+
+    <p class="auth-form__footer">
+      Already registered?
+      <a routerLink="/login">Sign in</a>
+    </p>
+  </form>
+</section>

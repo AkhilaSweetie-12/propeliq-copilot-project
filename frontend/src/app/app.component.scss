@@ -1,0 +1,118 @@
+
+:host {
+	display: block;
+	min-height: 100vh;
+}
+
+.skip-link {
+	position: absolute;
+	left: 1rem;
+	top: -3rem;
+	z-index: 20;
+	padding: 0.75rem 1rem;
+	background: var(--color-surface-raised);
+	color: var(--color-ink);
+	border-radius: var(--radius-sm);
+	transition: top 160ms ease;
+}
+
+.skip-link:focus {
+	top: 1rem;
+}
+
+.app-shell {
+	min-height: 100vh;
+	padding: 1.5rem;
+}
+
+.app-shell__header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	padding: 1rem 1.25rem;
+	margin-bottom: 1.5rem;
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-md);
+	background: var(--color-surface-glass);
+	backdrop-filter: blur(14px);
+}
+
+.app-shell__brand {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.9rem;
+	color: inherit;
+	text-decoration: none;
+}
+
+.app-shell__brand span {
+	display: grid;
+}
+
+.app-shell__brand strong {
+	font-family: var(--font-display);
+	font-size: 1.15rem;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+
+.app-shell__brand small {
+	color: var(--color-muted);
+}
+
+.app-shell__brand-mark {
+	display: inline-grid;
+	place-items: center;
+	width: 3rem;
+	height: 3rem;
+	border-radius: 1rem;
+	background: linear-gradient(135deg, var(--color-accent), var(--color-accent-strong));
+	color: var(--color-ink-inverse);
+	font-family: var(--font-mono);
+	font-size: 0.95rem;
+	letter-spacing: 0.1em;
+}
+
+.app-shell__nav {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.75rem;
+	flex-wrap: wrap;
+}
+
+.app-shell__identity {
+	color: var(--color-muted);
+}
+
+.app-shell__link,
+.app-shell__cta {
+	border: 0;
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	text-decoration: none;
+	cursor: pointer;
+}
+
+.app-shell__cta {
+	padding: 0.75rem 1rem;
+	border-radius: var(--radius-sm);
+	background: var(--color-ink);
+	color: var(--color-ink-inverse);
+}
+
+.app-shell__content {
+	min-height: calc(100vh - 8rem);
+}
+
+@media (max-width: 720px) {
+	.app-shell {
+		padding: 1rem;
+	}
+
+	.app-shell__header {
+		align-items: flex-start;
+		flex-direction: column;
+	}
+}
