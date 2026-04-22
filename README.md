@@ -1,4 +1,4 @@
-# PropelIQ-Copilot
+﻿# PropelIQ-Copilot
 
 ## Executive Summary
 
@@ -55,6 +55,85 @@ This ensures API keys and framework-specific files remain local to your developm
 3. Confirm that all workflows from `.github/prompts/` appear in the list
 
 If commands are visible, your setup is complete and PropelIQ-Copilot is ready to use.
+
+## Quick Start
+
+**New to this project?** Start here:
+
+- [REFERENCE] [QUICKSTART.md](QUICKSTART.md) — Get running in 5 minutes (local services)
+- [LAUNCH] [GCP_SETUP.md](GCP_SETUP.md) — Deploy to Google Cloud Platform
+- [DONE] [VALIDATION.md](VALIDATION.md) — Validate project completeness
+
+## Active CI/CD Workflows
+
+This repository includes three active GitHub Actions workflows:
+
+### 1. Continuous Integration (`ci.yml`)
+- **Triggers**: PR to main, push to main, manual dispatch
+- **Jobs**: Stack detection, API tests (.NET), Frontend tests (Node), E2E tests (Playwright)
+- **Status**: Runs on every commit to main branch
+
+### 2. Security Gates (`security-gates.yml`)
+- **Triggers**: PR to main, push to main, weekly schedule, manual dispatch
+- **Scans**: Dependency review, CodeQL analysis, secret scanning (Gitleaks), filesystem scanning (Trivy)
+- **Status**: Detects vulnerabilities and security issues
+
+### 3. GCP Infrastructure Deployment (`gcp-terraform-deploy.yml`)
+- **Triggers**: Manual dispatch from Actions tab
+- **Operations**: `plan` (dry-run) or `apply` (deploy)
+- **Environments**: dev, staging, prod with approval gates
+- **Infrastructure**: VPC, Cloud SQL, Cloud Run, KMS, Secret Manager, OIDC workload identity
+- **Status**: Ready for use after GCP/GitHub setup
+
+## GCP Deployment
+
+### Prerequisites
+
+Before deploying to GCP, complete these steps:
+
+1. **[Read GCP_SETUP.md](GCP_SETUP.md)** — Complete Phase 1 (GCP Project Setup)
+   - Create GCP project and enable APIs
+   - Create Terraform backend bucket (GCS)
+   - Set up service account and Workload Identity Federation
+
+2. **Update Terraform Configuration** — Complete Phase 2 (GCP_SETUP.md)
+   - Set GCP project ID, region, and resource names in `terraform.tfvars`
+   - Configure backend state bucket in `backend.hcl`
+
+3. **Configure GitHub Secrets** — Complete Phase 3 (GCP_SETUP.md)
+   - `GCP_WORKLOAD_IDENTITY_PROVIDER` (from Workload Identity setup)
+   - `GCP_TERRAFORM_SERVICE_ACCOUNT` (service account email)
+   - `TERRAFORM_BUCKET` (GCS bucket name)
+   - `CI_JWT_SIGNING_KEY` (for CI test environment)
+
+### First Deployment
+
+1. Go to **GitHub → Actions → GCP Terraform Deploy**
+2. Click **Run workflow**
+3. Select `environment=dev`, `operation=plan`
+4. Review terraform plan output
+5. If successful, run again with `operation=apply`
+
+### Environments
+
+| Environment | Approval Required | Auto-deploy | Use Case |
+|-------------|------------------|-------------|----------|
+| dev | No | Manual | Development & testing |
+| staging | Yes (1 reviewer) | Manual | Pre-production validation |
+| prod | Yes (2+ reviewers) | Manual | Production deployment |
+
+See [GCP_SETUP.md Phase 4](GCP_SETUP.md#phase-4-first-deployment-test) for detailed deployment walkthrough.
+
+## Infrastructure Components
+
+The Terraform configuration deploys:
+
+- **VPC Network** — Private VPC with Cloud SQL private IP networking
+- **Cloud SQL** — PostgreSQL 16 with pgvector extension
+- **Cloud Run** — ASP.NET Core API with auto-scaling
+- **Cloud KMS** — Data encryption keys for sensitive fields
+- **Secret Manager** — Secure storage for API keys and credentials
+- **OIDC Workload Identity** — GitHub Actions authentication without long-lived keys
 
 ## Prompts
 
@@ -433,6 +512,99 @@ For major enhancements requiring complete requirements specification and archite
     │   │   │   Output: project_plan.md (scope, milestones, cost baseline, risk register, team composition)
     │   │   │
     │   │   └── /create-sprint-plan [requires epics.md, us_*.md]
+
+## Project Artifacts Status
+
+| Artifact | Status | Location |
+|----------|--------|----------|
+| **Specifications** | [DONE] Complete | `.propel/context/docs/` |
+| - Functional Requirements | [DONE] Present | `spec.md` |
+| - Design & Architecture | [DONE] Present | `design.md` |
+| - UI/UX Specification | [DONE] Present | `figma_spec.md` |
+| - Design System | [DONE] Present | `designsystem.md` |
+| - Data Models | [DONE] Present | `models.md` |
+| **Backlog** | [DONE] Complete | `.propel/context/tasks/` |
+| - Epics | [DONE] 10 epics | `epics.md` |
+| - User Stories | [DONE] 140+ stories | `EP-XXX/us_XXX/` |
+| - Task Decomposition | [DONE] 2-3 per story | `task_*.md` |
+| **Infrastructure** | [DONE] Complete | `.propel/context/iac/gcp/` |
+| - Terraform Modules | [DONE] Present | `terraform/` |
+| - Multi-environment Config | [DONE] dev/staging/prod | `environments/` |
+| **CI/CD** | [DONE] Active | `.github/workflows/` |
+| - CI Workflow | [DONE] Active | `ci.yml` |
+| - Security Scanning | [DONE] Active | `security-gates.yml` |
+| - GCP Deployment | [DONE] Active | `gcp-terraform-deploy.yml` |
+| **UI/UX** | [DONE] Complete | `.propel/context/wireframes/` |
+| - Wireframes (22) | [DONE] HTML + CSS | `Hi-Fi/` |
+| - Component Library | [DONE] Present | `component-inventory.md` |
+| - Navigation Map | [DONE] Present | `navigation-map.md` |
+| **Local Development** | [DONE] Ready | Project Root |
+| - Docker Compose | [DONE] PostgreSQL + Redis | `docker-compose.yml` |
+| - Dockerfile (API) | [DONE] Multi-stage | `Dockerfile.api` |
+| - Dockerfile (Frontend) | [DONE] Multi-stage | `Dockerfile.frontend` |
+| - TypeScript Config | [DONE] Configured | `tsconfig.json` |
+| - Playwright Config | [DONE] Configured | `playwright.config.ts` |
+| **Documentation** | [DONE] Complete | Project Root |
+| - Quick Start Guide | [DONE] 5-minute setup | `QUICKSTART.md` |
+| - GCP Setup Guide | [DONE] Step-by-step | `GCP_SETUP.md` |
+| - Validation Checklist | [DONE] Comprehensive | `VALIDATION.md` |
+
+## Documentation Map
+
+### Getting Started
+- **[QUICKSTART.md](QUICKSTART.md)** — 5-minute local setup with Docker
+- **[GCP_SETUP.md](GCP_SETUP.md)** — Complete GCP deployment guide (Phases 1-5)
+- **[VALIDATION.md](VALIDATION.md)** — Project validation checklist
+
+### Development Standards
+- **[.github/instructions/](./github/instructions/)** — 40+ development standards (languages, frameworks, security, testing)
+- **[.github/prompts/](./github/prompts/)** — 36 MCP agent prompts for automated workflows
+- **[.propel/templates/](./propel/templates/)** — 27 code generation templates
+
+### Architecture & Design
+- **[.propel/context/docs/spec.md](./.propel/context/docs/spec.md)** — Functional requirements (FR-XXX, UC-XXX)
+- **[.propel/context/docs/design.md](./.propel/context/docs/design.md)** — Architecture & non-functional requirements
+- **[.propel/context/docs/figma_spec.md](./.propel/context/docs/figma_spec.md)** — UI/UX specifications
+- **[.propel/context/docs/designsystem.md](./.propel/context/docs/designsystem.md)** — Design tokens & component library
+- **[.propel/context/docs/models.md](./.propel/context/docs/models.md)** — UML diagrams and data models
+
+### Implementation
+- **[.propel/context/tasks/](./propel/context/tasks/)** — User stories with task decomposition (140+ items)
+- **[.propel/context/wireframes/](./propel/context/wireframes/)** — 22 responsive UI wireframes
+- **[.propel/context/iac/gcp/](./propel/context/iac/gcp/)** — GCP Terraform infrastructure
+
+### DevOps & Deployment
+- **[.github/workflows/](./github/workflows/)** — 3 active CI/CD workflows
+- **[GCP_SETUP.md](GCP_SETUP.md)** — GCP authentication and deployment steps
+- **[docker-compose.yml](docker-compose.yml)** — Local PostgreSQL + Redis
+
+## Next Steps
+
+1. **Local Development**
+   ```bash
+   docker-compose up -d
+   # Services running on: postgres:5432, redis:6379
+   ```
+
+2. **Cloud Deployment**
+   - Follow [GCP_SETUP.md](GCP_SETUP.md) (45-60 minutes, one-time setup)
+   - Deploy via GitHub Actions (manual dispatch)
+
+3. **Validate Project**
+   - Run checklist in [VALIDATION.md](VALIDATION.md)
+   - Expected score: 70/80 → Ready for development
+
+4. **Generate Application**
+   - Use orchestrators to generate React + ASP.NET source code
+   - Update Dockerfiles and CI/CD with build steps
+   - Push images to Artifact Registry
+   - Deploy via Cloud Run
+
+---
+
+**Last Updated**: 2026-04-22  
+**Status**: Framework Complete, Ready for Application Integration  
+**Next Phase**: Application source code generation and deployment
     │   │           Output: sprint_plan.md (dependency-ordered sprints, sprint goals, critical path)
     │   │
     │   ├── /plan-cloud-infrastructure

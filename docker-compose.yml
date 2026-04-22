@@ -1,70 +1,87 @@
-version: '3.9'
+version: "3.9"
 
 services:
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile.dev
-    ports:
-      - "4200:4200"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
+  # PostgreSQL database with pgvector extension for AI embeddings
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: propeliq-postgres
     environment:
-      - API_URL=http://localhost:3000
-    depends_on:
-      - backend
-
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile.dev
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./backend:/app
-      - /app/node_modules
-    environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/appdb
-      - REDIS_URL=redis://redis:6379
-      - JWT_SECRET=${JWT_SECRET}
-      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
-      - JWT_ACCESS_EXPIRES=15m
-      - JWT_REFRESH_EXPIRES=7d
-      - CORS_ORIGIN=http://localhost:4200
-      - NODE_ENV=development
-      - PORT=3000
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-
-  db:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: appdb
+      POSTGRES_USER: ${DB_USER:-propeliq_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-propeliq_password}
+      POSTGRES_DB: ${DB_NAME:-propeliq_dev}
+      POSTGRES_INITDB_ARGS: "-c shared_preload_libraries=pgvector"
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-propeliq_user}"]
+      interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - propeliq-network
 
+  # Redis for session management and caching
   redis:
     image: redis:7-alpine
+    container_name: propeliq-redis
     ports:
       - "6379:6379"
+    volumes:
+      - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - propeliq-network
+    command: redis-server --appendonly yes
+
+  # ASP.NET Core API (when app source available)
+  # api:
+  #   build:
+  #     context: .
+  #     dockerfile: ./src/api/Dockerfile
+  #   container_name: propeliq-api
+  #   environment:
+  #     ASPNETCORE_ENVIRONMENT: Development
+  #     ASPNETCORE_URLS: http://+:5000
+  #     DATABASE_URL: Host=postgres;Port=5432;Database=${DB_NAME:-propeliq_dev};Username=${DB_USER:-propeliq_user};Password=${DB_PASSWORD:-propeliq_password}
+  #     REDIS_URL: redis://redis:6379
+  #   ports:
+  #     - "5000:5000"
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   networks:
+  #     - propeliq-network
+
+  # React frontend (when app source available)
+  # frontend:
+  #   build:
+  #     context: ./src/frontend
+  #     dockerfile: Dockerfile
+  #   container_name: propeliq-frontend
+  #   environment:
+  #     VITE_API_URL: http://localhost:5000
+  #   ports:
+  #     - "5173:5173"
+  #   depends_on:
+  #     - api
+  #   networks:
+  #     - propeliq-network
 
 volumes:
   postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  propeliq-network:
+    driver: bridge
