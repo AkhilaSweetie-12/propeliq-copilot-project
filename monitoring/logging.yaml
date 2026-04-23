@@ -1,0 +1,259 @@
+# Logging configuration for PropelIQ application
+# This configuration defines structured logging for both frontend and backend
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logging-config
+  namespace: default
+data:
+  # Frontend logging configuration
+  frontend-logging.json: |
+    {
+      "version": 1,
+      "disable_existing_loggers": false,
+      "formatters": {
+        "json": {
+          "format": "%(asctime)s %(name)s %(levelname)s %(message)s",
+          "datefmt": "%Y-%m-%dT%H:%M:%S"
+        },
+        "detailed": {
+          "format": "%(asctime)s %(name)s %(levelname)s %(pathname)s:%(lineno)d %(message)s",
+          "datefmt": "%Y-%m-%dT%H:%M:%S"
+        }
+      },
+      "handlers": {
+        "console": {
+          "class": "logging.StreamHandler",
+          "level": "INFO",
+          "formatter": "json",
+          "stream": "ext://sys.stdout"
+        },
+        "error_console": {
+          "class": "logging.StreamHandler",
+          "level": "ERROR",
+          "formatter": "detailed",
+          "stream": "ext://sys.stderr"
+        }
+      },
+      "loggers": {
+        "": {
+          "level": "INFO",
+          "handlers": ["console", "error_console"]
+        },
+        "app": {
+          "level": "DEBUG",
+          "handlers": ["console", "error_console"],
+          "propagate": false
+        },
+        "http": {
+          "level": "INFO",
+          "handlers": ["console"],
+          "propagate": false
+        }
+      }
+    }
+
+  # Backend logging configuration (.NET)
+  backend-logging.json: |
+    {
+      "Logging": {
+        "LogLevel": {
+          "Default": "Information",
+          "Microsoft.AspNetCore": "Warning",
+          "Microsoft.EntityFrameworkCore.Database.Command": "Information",
+          "System": "Warning"
+        },
+        "Console": {
+          "IncludeScopes": true,
+          "TimestampFormat": "yyyy-MM-dd HH:mm:ss "
+        },
+        "File": {
+          "Path": "logs/app-.log",
+          "RollingInterval": "Day",
+          "RetainedFileCountLimit": 30,
+          "OutputTemplate": "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}"
+        },
+        "ApplicationInsights": {
+          "LogLevel": {
+            "Default": "Information",
+            "Microsoft": "Warning"
+          }
+        },
+        "Gcp": {
+          "LogLevel": {
+            "Default": "Information",
+            "Microsoft": "Warning"
+          },
+          "ProjectId": "${PROJECT_ID}",
+          "LogId": "propeliq-backend"
+        }
+      },
+      "AllowedHosts": "*"
+    }
+
+---
+# GCP Cloud Logging configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gcp-logging-config
+  namespace: default
+data:
+  # Log sink configuration
+  log-sinks.json: |
+    {
+      "sinks": [
+        {
+          "name": "propeliq-error-sink",
+          "filter": "severity >= ERROR",
+          "destination": "bigquery.googleapis.com/projects/${PROJECT_ID}/datasets/propeliq_errors",
+          "uniqueWriter": true
+        },
+        {
+          "name": "propeliq-audit-sink",
+          "filter": 'logName="projects/${PROJECT_ID}/logs/cloudaudit.googleapis.com%2Factivity"',
+          "destination": "bigquery.googleapis.com/projects/${PROJECT_ID}/datasets/propeliq_audit",
+          "uniqueWriter": true
+        },
+        {
+          "name": "propeliq-performance-sink",
+          "filter": 'jsonPayload.type="performance"',
+          "destination": "bigquery.googleapis.com/projects/${PROJECT_ID}/datasets/propeliq_performance",
+          "uniqueWriter": true
+        }
+      ]
+    }
+
+  # Log-based metrics configuration
+  log-metrics.json: |
+    {
+      "metrics": [
+        {
+          "name": "error_count",
+          "filter": "resource.type=\"cloud_run_revision\" AND severity=\"ERROR\"",
+          "metricKind": "DELTA",
+          "valueType": "INT64",
+          "description": "Count of error logs"
+        },
+        {
+          "name": "warning_count",
+          "filter": "resource.type=\"cloud_run_revision\" AND severity=\"WARNING\"",
+          "metricKind": "DELTA",
+          "valueType": "INT64",
+          "description": "Count of warning logs"
+        },
+        {
+          "name": "api_response_time",
+          "filter": "resource.type=\"cloud_run_revision\" AND jsonPayload.type=\"api_performance\"",
+          "metricKind": "DELTA",
+          "valueType": "DISTRIBUTION",
+          "description": "API response time distribution"
+        },
+        {
+          "name": "user_actions",
+          "filter": "resource.type=\"cloud_run_revision\" AND jsonPayload.type=\"user_action\"",
+          "metricKind": "DELTA",
+          "valueType": "INT64",
+          "description": "Count of user actions"
+        },
+        {
+          "name": "database_queries",
+          "filter": "resource.type=\"cloud_run_revision\" AND jsonPayload.type=\"database_query\"",
+          "metricKind": "DELTA",
+          "valueType": "DISTRIBUTION",
+          "description": "Database query performance"
+        }
+      ]
+    }
+
+---
+# Structured logging examples for different components
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logging-examples
+  namespace: default
+data:
+  # Frontend logging examples
+  frontend-examples.json: |
+    {
+      "examples": {
+        "user_action": {
+          "type": "user_action",
+          "action": "button_click",
+          "component": "appointment_booking",
+          "user_id": "user_123",
+          "session_id": "session_456",
+          "timestamp": "2024-01-15T10:30:00Z",
+          "metadata": {
+            "button_id": "book_appointment",
+            "page": "/appointments",
+            "user_agent": "Mozilla/5.0..."
+          }
+        },
+        "performance": {
+          "type": "performance",
+          "metric": "page_load",
+          "value": 2.5,
+          "unit": "seconds",
+          "page": "/dashboard",
+          "user_id": "user_123",
+          "timestamp": "2024-01-15T10:30:00Z"
+        },
+        "error": {
+          "type": "error",
+          "message": "Failed to load appointment data",
+          "error_code": "APPOINTMENT_LOAD_FAILED",
+          "stack_trace": "...",
+          "user_id": "user_123",
+          "session_id": "session_456",
+          "timestamp": "2024-01-15T10:30:00Z"
+        }
+      }
+    }
+
+  # Backend logging examples (.NET)
+  backend-examples.json: |
+    {
+      "examples": {
+        "api_request": {
+          "type": "api_performance",
+          "endpoint": "/api/appointments",
+          "method": "POST",
+          "status_code": 200,
+          "response_time_ms": 250,
+          "user_id": "user_123",
+          "correlation_id": "correlation_789",
+          "timestamp": "2024-01-15T10:30:00Z"
+        },
+        "database_query": {
+          "type": "database_query",
+          "query": "SELECT * FROM appointments WHERE user_id = @user_id",
+          "execution_time_ms": 45,
+          "parameters": ["user_123"],
+          "success": true,
+          "timestamp": "2024-01-15T10:30:00Z"
+        },
+        "security_event": {
+          "type": "security",
+          "event": "authentication_attempt",
+          "user_id": "user_123",
+          "ip_address": "192.168.1.100",
+          "success": true,
+          "timestamp": "2024-01-15T10:30:00Z"
+        },
+        "business_event": {
+          "type": "business_event",
+          "event": "appointment_booked",
+          "appointment_id": "apt_456",
+          "user_id": "user_123",
+          "provider_id": "prov_789",
+          "timestamp": "2024-01-15T10:30:00Z",
+          "metadata": {
+            "appointment_time": "2024-01-20T14:00:00Z",
+            "appointment_type": "general_practice"
+          }
+        }
+      }
+    }

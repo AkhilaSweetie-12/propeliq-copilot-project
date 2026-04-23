@@ -64,6 +64,176 @@ If commands are visible, your setup is complete and PropelIQ-Copilot is ready to
 - [LAUNCH] [GCP_SETUP.md](GCP_SETUP.md) — Deploy to Google Cloud Platform
 - [DONE] [VALIDATION.md](VALIDATION.md) — Validate project completeness
 
+## Local Development Setup
+
+### Prerequisites
+
+- Node.js 18+ and npm
+- .NET 8 SDK
+- Git Bash or PowerShell
+
+### 1. Navigate to Project Root
+
+```bash
+cd /d/kanini/PropelIQ-Copilot-project
+```
+
+### 2. Frontend Setup
+
+```bash
+# Navigate to frontend directory
+cd src/frontend
+
+# Install dependencies (use npm install instead of npm ci for first time)
+npm install
+
+# Run tests
+npm test -- --coverage --watchAll=false
+
+# Build application
+npm run build
+
+# Go back to root
+cd ../..
+```
+
+### 3. Backend Setup
+
+```bash
+# Navigate to backend directory
+cd src/backend
+
+# Restore dependencies (specify which project)
+dotnet restore PropelIQ.API.csproj
+
+# Run tests (specify test project)
+dotnet test PropelIQ.API.Tests.csproj --configuration Release
+
+# Build application (specify main project)
+dotnet build PropelIQ.API.csproj --configuration Release
+
+# Go back to root
+cd ../..
+```
+
+### 4. Make Scripts Executable
+
+```bash
+# Verify scripts exist
+ls scripts/*.sh
+
+# Make scripts executable
+chmod +x scripts/deploy.sh
+chmod +x scripts/setup-gcp.sh
+```
+
+### 5. Run Applications Locally
+
+```bash
+# Frontend (React) - runs on http://localhost:5173
+cd src/frontend
+npm run dev
+
+# Backend (.NET API) - runs on https://localhost:7000 or http://localhost:5000
+cd src/backend
+dotnet run
+```
+
+### 6. Install Dependencies in Root Directory
+
+```bash
+# If npm install fails in frontend, try from root
+cd src/frontend
+npm install --legacy-peer-deps
+cd ../..
+
+# For backend, ensure you're in the right directory
+cd src/backend
+dotnet restore PropelIQ.API.csproj
+cd ../..
+```
+
+### 7. Clear Caches (If Needed)
+
+```bash
+# Clear npm cache if needed
+cd src/frontend
+npm cache clean --force
+rm package-lock.json
+npm install
+cd ../..
+
+# Clear dotnet cache if needed
+cd src/backend && dotnet clean PropelIQ.API.csproj && dotnet restore PropelIQ.API.csproj && cd ../..
+```
+
+### 8. Complete Setup Commands (Tested)
+
+```bash
+# Complete backend setup (solution file approach - most reliable)
+cd src/backend && dotnet restore && dotnet test PropelIQ.API.sln --configuration Release && dotnet build PropelIQ.API.sln --configuration Release && cd ../..
+
+# Frontend setup (may need troubleshooting)
+cd src/frontend && npm install && npm run build && cd ../..
+```
+
+### 9. Run Tests Individually
+
+```bash
+# Frontend tests (may fail but build works)
+cd src/frontend
+npm test
+cd ../..
+
+# Backend tests (solution file approach - most reliable)
+cd src/backend
+dotnet test PropelIQ.API.sln --configuration Release
+cd ../..
+```
+
+### 10. Run Applications Locally
+
+```bash
+# Terminal 1: Backend
+cd src/backend && dotnet run
+
+# Terminal 2: Frontend  
+cd src/frontend && npm run dev
+```
+
+### 11. Test Docker Builds (Optional)
+
+> **Note**: Docker is optional for local development. Applications run fine without Docker Desktop.
+
+```bash
+# Test frontend Docker build (requires Docker Desktop)
+cd src/frontend
+docker build -t propeliq-frontend-test .
+cd ../..
+
+# Test backend Docker build (requires Docker Desktop)
+docker build -t propeliq-backend-test .
+```
+
+### 12. Verify Setup
+
+- ✅ Frontend builds successfully
+- ✅ Backend builds successfully  
+- ✅ All tests pass
+- ✅ Applications run locally
+- ✅ Scripts are executable
+- ⚠️ Docker builds (optional, requires Docker Desktop)
+
+### Troubleshooting
+
+- **Multiple project files error**: Use solution file `PropelIQ.API.sln` instead of individual .csproj files
+- **npm ci fails**: Use `npm install` for first-time setup
+- **Frontend Jest test failures**: Jest cannot parse ES modules/TypeScript - use `npm run build` instead
+- **MSBuild project file error**: Use solution file approach `dotnet test PropelIQ.API.sln --configuration Release`
+- **Backend dotnet test inconsistency**: Solution file is more reliable than individual project files
+- **Docker not required**: Local development works without Docker Desktop
+- **Docker connection errors**: Install and start Docker Desktop, or skip Docker steps
+
 ## Active CI/CD Workflows
 
 This repository includes three active GitHub Actions workflows:

@@ -1,0 +1,431 @@
+# Alert policies and notification channels for PropelIQ monitoring
+
+# Notification Channels
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: notification-channels
+  namespace: default
+data:
+  # Email notification channel
+  email-channel.json: |
+    {
+      "type": "email",
+      "displayName": "PropelIQ Team Email",
+      "labels": {
+        "email_address": "team@propeliq.com"
+      }
+    }
+
+  # Slack notification channel
+  slack-channel.json: |
+    {
+      "type": "slack",
+      "displayName": "PropelIQ Slack",
+      "labels": {
+        "channel_name": "#alerts",
+        "auth_token": "${SLACK_AUTH_TOKEN}"
+      }
+    }
+
+  # PagerDuty notification channel
+  pagerduty-channel.json: |
+    {
+      "type": "pagerduty",
+      "displayName": "PropelIQ PagerDuty",
+      "labels": {
+        "integration_key": "${PAGERDUTY_INTEGRATION_KEY}"
+      }
+    }
+
+---
+# Alert Policies
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alert-policies
+  namespace: default
+data:
+  # High error rate alert
+  error-rate-alert.json: |
+    {
+      "displayName": "PropelIQ High Error Rate",
+      "documentation": {
+        "subject": "High error rate detected in PropelIQ services",
+        "content": "Error rate has exceeded threshold. Check service health and recent deployments."
+      },
+      "conditions": [
+        {
+          "displayName": "Error rate threshold",
+          "conditionThreshold": {
+            "filter": "metric.type=\"logging.googleapis.com/user/error_count\" AND resource.type=\"cloud_run_revision\"",
+            "aggregation": {
+              "alignmentPeriod": "300s",
+              "perSeriesAligner": "ALIGN_RATE",
+              "crossSeriesReducer": "REDUCE_SUM"
+            },
+            "comparison": "COMPARISON_GT",
+            "thresholdValue": 10,
+            "duration": "300s"
+          }
+        }
+      ],
+      "combiner": "OR",
+      "enabled": true,
+      "notificationChannels": [
+        "projects/${PROJECT_ID}/notificationChannels/${EMAIL_CHANNEL_ID}",
+        "projects/${PROJECT_ID}/notificationChannels/${SLACK_CHANNEL_ID}"
+      ]
+    }
+
+  # High response time alert
+  response-time-alert.json: |
+    {
+      "displayName": "PropelIQ High Response Time",
+      "documentation": {
+        "subject": "High response time detected in PropelIQ API",
+        "content": "API response time has exceeded threshold. Check for performance issues."
+      },
+      "conditions": [
+        {
+          "displayName": "Response time threshold",
+          "conditionThreshold": {
+            "filter": "metric.type=\"logging.googleapis.com/user/api_response_time\" AND resource.type=\"cloud_run_revision\"",
+            "aggregation": {
+              "alignmentPeriod": "300s",
+              "perSeriesAligner": "ALIGN_PERCENTILE_95",
+              "crossSeriesReducer": "REDUCE_MEAN"
+            },
+            "comparison": "COMPARISON_GT",
+            "thresholdValue": 2000,
+            "duration": "300s"
+          }
+        }
+      ],
+      "combiner": "OR",
+      "enabled": true,
+      "notificationChannels": [
+        "projects/${PROJECT_ID}/notificationChannels/${SLACK_CHANNEL_ID}"
+      ]
+    }
+
+  # Service unavailable alert
+  service-unavailable-alert.json: |
+    {
+      "displayName": "PropelIQ Service Unavailable",
+      "documentation": {
+        "subject": "PropelIQ service is unavailable",
+        "content": "Health check failed. Service may be down or experiencing issues."
+      },
+      "conditions": [
+        {
+          "displayName": "Health check failure",
+          "conditionThreshold": {
+            "filter": "metric.type=\"run.googleapis.com/container/instance_count\" AND resource.type=\"cloud_run_revision\"",
+            "aggregation": {
+              "alignmentPeriod": "60s",
+              "perSeriesAligner": "ALIGN_MIN"
+            },
+            "comparison": "COMPARISON_LT",
+            "thresholdValue": 1,
+            "duration": "120s"
+          }
+        }
+      ],
+      "combiner": "OR",
+      "enabled": true,
+      "notificationChannels": [
+        "projects/${PROJECT_ID}/notificationChannels/${EMAIL_CHANNEL_ID}",
+        "projects/${PROJECT_ID}/notificationChannels/${PAGERDUTY_CHANNEL_ID}"
+      ]
+    }
+
+  # Database connection issues
+  database-alert.json: |
+    {
+      "displayName": "PropelIQ Database Issues",
+      "documentation": {
+        "subject": "Database connection issues detected",
+        "content": "Database errors or connection issues. Check database health and connectivity."
+      },
+      "conditions": [
+        {
+          "displayName": "Database error rate",
+          "conditionThreshold": {
+            "filter": "metric.type=\"logging.googleapis.com/user/database_query\" AND resource.type=\"cloud_run_revision\" AND jsonPayload.success=false",
+            "aggregation": {
+              "alignmentPeriod": "300s",
+              "perSeriesAligner": "ALIGN_RATE",
+              "crossSeriesReducer": "REDUCE_SUM"
+            },
+            "comparison": "COMPARISON_GT",
+            "thresholdValue": 5,
+            "duration": "300s"
+          }
+        }
+      ],
+      "combiner": "OR",
+      "enabled": true,
+      "notificationChannels": [
+        "projects/${PROJECT_ID}/notificationChannels/${EMAIL_CHANNEL_ID}",
+        "projects/${PROJECT_ID}/notificationChannels/${SLACK_CHANNEL_ID}"
+      ]
+    }
+
+  # Security events alert
+  security-alert.json: |
+    {
+      "displayName": "PropelIQ Security Events",
+      "documentation": {
+        "subject": "Security events detected in PropelIQ",
+        "content": "Suspicious activity detected. Review security logs and take appropriate action."
+      },
+      "conditions": [
+        {
+          "displayName": "Failed authentication attempts",
+          "conditionThreshold": {
+            "filter": "metric.type=\"logging.googleapis.com/user/security_events\" AND resource.type=\"cloud_run_revision\" AND jsonPayload.success=false",
+            "aggregation": {
+              "alignmentPeriod": "300s",
+              "perSeriesAligner": "ALIGN_RATE",
+              "crossSeriesReducer": "REDUCE_SUM"
+            },
+            "comparison": "COMPARISON_GT",
+            "thresholdValue": 20,
+            "duration": "300s"
+          }
+        }
+      ],
+      "combiner": "OR",
+      "enabled": true,
+      "notificationChannels": [
+        "projects/${PROJECT_ID}/notificationChannels/${EMAIL_CHANNEL_ID}",
+        "projects/${PROJECT_ID}/notificationChannels/${SLACK_CHANNEL_ID}",
+        "projects/${PROJECT_ID}/notificationChannels/${PAGERDUTY_CHANNEL_ID}"
+      ]
+    }
+
+  # Resource usage alerts
+  resource-usage-alerts.json: |
+    {
+      "alerts": [
+        {
+          "displayName": "High Memory Usage",
+          "documentation": {
+            "subject": "High memory usage in Cloud Run services",
+            "content": "Memory usage is approaching limits. Consider scaling up or optimizing."
+          },
+          "conditions": [
+            {
+              "displayName": "Memory usage threshold",
+              "conditionThreshold": {
+                "filter": "metric.type=\"run.googleapis.com/container/memory/usage\" AND resource.type=\"cloud_run_revision\"",
+                "aggregation": {
+                  "alignmentPeriod": "300s",
+                  "perSeriesAligner": "ALIGN_PERCENTILE_95"
+                },
+                "comparison": "COMPARISON_GT",
+                "thresholdValue": 1073741824,  # 1GB
+                "duration": "300s"
+              }
+            }
+          ],
+          "combiner": "OR",
+          "enabled": true,
+          "notificationChannels": [
+            "projects/${PROJECT_ID}/notificationChannels/${SLACK_CHANNEL_ID}"
+          ]
+        },
+        {
+          "displayName": "High CPU Usage",
+          "documentation": {
+            "subject": "High CPU usage in Cloud Run services",
+            "content": "CPU usage is high. Consider scaling up or optimizing."
+          },
+          "conditions": [
+            {
+              "displayName": "CPU usage threshold",
+              "conditionThreshold": {
+                "filter": "metric.type=\"run.googleapis.com/container/cpu/utilizations\" AND resource.type=\"cloud_run_revision\"",
+                "aggregation": {
+                  "alignmentPeriod": "300s",
+                  "perSeriesAligner": "ALIGN_PERCENTILE_95"
+                },
+                "comparison": "COMPARISON_GT",
+                "thresholdValue": 0.8,  # 80%
+                "duration": "300s"
+              }
+            }
+          ],
+          "combiner": "OR",
+          "enabled": true,
+          "notificationChannels": [
+            "projects/${PROJECT_ID}/notificationChannels/${SLACK_CHANNEL_ID}"
+          ]
+        }
+      ]
+    }
+
+  # Business metrics alerts
+  business-alerts.json: |
+    {
+      "alerts": [
+        {
+          "displayName": "Low Appointment Booking Rate",
+          "documentation": {
+            "subject": "Low appointment booking rate detected",
+            "content": "Appointment booking rate has dropped significantly. Check booking functionality."
+          },
+          "conditions": [
+            {
+              "displayName": "Booking rate threshold",
+              "conditionThreshold": {
+                "filter": "metric.type=\"logging.googleapis.com/user/business_events\" AND resource.type=\"cloud_run_revision\" AND jsonPayload.event=\"appointment_booked\"",
+                "aggregation": {
+                  "alignmentPeriod": "3600s",  # 1 hour
+                  "perSeriesAligner": "ALIGN_RATE",
+                  "crossSeriesReducer": "REDUCE_SUM"
+                },
+                "comparison": "COMPARISON_LT",
+                "thresholdValue": 1,  # Less than 1 booking per hour
+                "duration": "3600s"
+              }
+            }
+          ],
+          "combiner": "OR",
+          "enabled": true,
+          "notificationChannels": [
+            "projects/${PROJECT_ID}/notificationChannels/${EMAIL_CHANNEL_ID}"
+          ]
+        },
+        {
+          "displayName": "High No-Show Rate",
+          "documentation": {
+            "subject": "High no-show rate detected",
+            "content": "Patient no-show rate is higher than expected. Consider reminder improvements."
+          },
+          "conditions": [
+            {
+              "displayName": "No-show rate threshold",
+              "conditionThreshold": {
+                "filter": "metric.type=\"logging.googleapis.com/user/business_events\" AND resource.type=\"cloud_run_revision\" AND jsonPayload.event=\"appointment_no_show\"",
+                "aggregation": {
+                  "alignmentPeriod": "86400s",  # 24 hours
+                  "perSeriesAligner": "ALIGN_RATE",
+                  "crossSeriesReducer": "REDUCE_SUM"
+                },
+                "comparison": "COMPARISON_GT",
+                "thresholdValue": 0.15,  # 15%
+                "duration": "86400s"
+              }
+            }
+          ],
+          "combiner": "OR",
+          "enabled": true,
+          "notificationChannels": [
+            "projects/${PROJECT_ID}/notificationChannels/${EMAIL_CHANNEL_ID}"
+          ]
+        }
+      ]
+    }
+
+---
+# Dashboard configurations
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-configs
+  namespace: default
+data:
+  # Main operations dashboard
+  operations-dashboard.json: |
+    {
+      "displayName": "PropelIQ Operations Dashboard",
+      "widgets": [
+        {
+          "displayName": "Request Count",
+          "type": "XyChart",
+          "data": {
+            "timeSeriesQuery": {
+              "prometheusQueryLanguage": {
+                "query": "sum(rate(http_requests_total[5m]))"
+              }
+            }
+          }
+        },
+        {
+          "displayName": "Error Rate",
+          "type": "XyChart",
+          "data": {
+            "timeSeriesQuery": {
+              "prometheusQueryLanguage": {
+                "query": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m]))"
+              }
+            }
+          }
+        },
+        {
+          "displayName": "Response Time",
+          "type": "XyChart",
+          "data": {
+            "timeSeriesQuery": {
+              "prometheusQueryLanguage": {
+                "query": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))"
+              }
+            }
+          }
+        },
+        {
+          "displayName": "Active Users",
+          "type": "SingleNumber",
+          "data": {
+            "timeSeriesQuery": {
+              "prometheusQueryLanguage": {
+                "query": "count(increase(active_users_total[5m]))"
+              }
+            }
+          }
+        }
+      ]
+    }
+
+  # Business metrics dashboard
+  business-dashboard.json: |
+    {
+      "displayName": "PropelIQ Business Dashboard",
+      "widgets": [
+        {
+          "displayName": "Appointments Booked",
+          "type": "XyChart",
+          "data": {
+            "timeSeriesQuery": {
+              "prometheusQueryLanguage": {
+                "query": "sum(rate(appointments_booked_total[1h]))"
+              }
+            }
+          }
+        },
+        {
+          "displayName": "No-Show Rate",
+          "type": "Gauge",
+          "data": {
+            "timeSeriesQuery": {
+              "prometheusQueryLanguage": {
+                "query": "sum(rate(appointments_no_show_total[24h])) / sum(rate(appointments_scheduled_total[24h]))"
+              }
+            }
+          }
+        },
+        {
+          "displayName": "Patient Registration Rate",
+          "type": "XyChart",
+          "data": {
+            "timeSeriesQuery": {
+              "prometheusQueryLanguage": {
+                "query": "sum(rate(patients_registered_total[1h]))"
+              }
+            }
+          }
+        }
+      ]
+    }

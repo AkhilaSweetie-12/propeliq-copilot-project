@@ -1,0 +1,276 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  REGISTRY: gcr.io
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+
+jobs:
+  detect-stack:
+    name: Detect Technology Stack
+    runs-on: ubuntu-latest
+    outputs:
+      has-frontend: ${{ steps.detect.outputs.has-frontend }}
+      has-backend: ${{ steps.detect.outputs.has-backend }}
+      has-tests: ${{ steps.detect.outputs.has-tests }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Detect project structure
+        id: detect
+        run: |
+          has_frontend=false
+          has_backend=false
+          has_tests=false
+
+          # Check for frontend
+          if [ -d "src/frontend" ] || [ -f "package.json" ] || [ -f "src/frontend/package.json" ]; then
+            has_frontend=true
+          fi
+
+          # Check for backend (.NET)
+          if [ -f "*.csproj" ] || [ -f "*.sln" ] || [ -d "src/backend" ]; then
+            has_backend=true
+          fi
+
+          # Check for tests
+          if [ -d "tests" ] || [ -d "test" ] || [ -d "__tests__" ]; then
+            has_tests=true
+          fi
+
+          echo "has-frontend=$has_frontend" >> $GITHUB_OUTPUT
+          echo "has-backend=$has_backend" >> $GITHUB_OUTPUT
+          echo "has-tests=$has_tests" >> $GITHUB_OUTPUT
+
+          echo "Frontend detected: $has_frontend"
+          echo "Backend detected: $has_backend"
+          echo "Tests detected: $has_tests"
+
+  frontend-tests:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+    needs: detect-stack
+    if: needs.detect-stack.outputs.has-frontend == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: src/frontend/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          if [ -f "src/frontend/package.json" ]; then
+            cd src/frontend
+            npm ci
+          elif [ -f "package.json" ]; then
+            npm ci
+          fi
+
+      - name: Run tests
+        run: |
+          if [ -f "src/frontend/package.json" ]; then
+            cd src/frontend
+            npm test -- --coverage --watchAll=false
+          elif [ -f "package.json" ]; then
+            npm test -- --coverage --watchAll=false
+          fi
+
+      - name: Build frontend
+        run: |
+          if [ -f "src/frontend/package.json" ]; then
+            cd src/frontend
+            npm run build
+          elif [ -f "package.json" ]; then
+            npm run build
+          fi
+
+  backend-tests:
+    name: Backend Tests (.NET)
+    runs-on: ubuntu-latest
+    needs: detect-stack
+    if: needs.detect-stack.outputs.has-backend == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: |
+          if [ -f "*.sln" ]; then
+            dotnet restore
+          elif [ -f "src/backend/*.csproj" ]; then
+            cd src/backend
+            dotnet restore
+          fi
+
+      - name: Build
+        run: |
+          if [ -f "*.sln" ]; then
+            dotnet build --no-restore --configuration Release
+          elif [ -f "src/backend/*.csproj" ]; then
+            cd src/backend
+            dotnet build --no-restore --configuration Release
+          fi
+
+      - name: Test
+        run: |
+          if [ -f "*.sln" ]; then
+            dotnet test --no-build --configuration Release --verbosity normal --collect:"XPlat Code Coverage"
+          elif [ -f "src/backend/*.csproj" ]; then
+            cd src/backend
+            dotnet test --no-build --configuration Release --verbosity normal --collect:"XPlat Code Coverage"
+          fi
+
+  e2e-tests:
+    name: E2E Tests (Playwright)
+    runs-on: ubuntu-latest
+    needs: detect-stack
+    if: needs.detect-stack.outputs.has-frontend == 'true' && needs.detect-stack.outputs.has-backend == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install Playwright
+        run: |
+          if [ -f "package.json" ]; then
+            npm ci
+            npx playwright install --with-deps
+          elif [ -f "test-automation/package.json" ]; then
+            cd test-automation
+            npm ci
+            npx playwright install --with-deps
+          fi
+
+      - name: Run E2E tests
+        run: |
+          if [ -f "test-automation" ]; then
+            cd test-automation
+            npx playwright test
+          else
+            npx playwright test
+          fi
+        env:
+          CI: true
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  build-and-push:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+    needs: [detect-stack, frontend-tests, backend-tests]
+    if: github.ref == 'refs/heads/main' && (needs.detect-stack.outputs.has-frontend == 'true' || needs.detect-stack.outputs.has-backend == 'true')
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          token_format: 'access_token'
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_TERRAFORM_SERVICE_ACCOUNT }}
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Google Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+
+      - name: Build and push frontend image
+        if: needs.detect-stack.outputs.has-frontend == 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: ./src/frontend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/propeliq-frontend:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/propeliq-frontend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push backend image
+        if: needs.detect-stack.outputs.has-backend == 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/propeliq-backend:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/propeliq-backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  notify:
+    name: Notify Results
+    runs-on: ubuntu-latest
+    needs: [frontend-tests, backend-tests, e2e-tests, security-scan, build-and-push]
+    if: always()
+    steps:
+      - name: Notify on success
+        if: needs.build-and-push.result == 'success'
+        run: |
+          echo "SUCCESS: CI pipeline completed successfully!"
+          echo "INFO: Images built and pushed to GCR"
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "ERROR: CI pipeline failed!"
+          echo "INFO: Check the logs for details"
